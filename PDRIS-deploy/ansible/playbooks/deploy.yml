@@ -1,12 +1,12 @@
 ---
-- name: Deploy pdris-app
+- name: Deploy devops_sem_task5_project
   hosts: app_hosts
   gather_facts: true
   become: true
   vars:
     deploy_dir: /opt/pdris
-    service_name: pdris-app
-    artifact_name: pdris-app.jar
+    service_name: devops_sem_task5_project
+    artifact_name: devops_sem_task5_project.jar
     app_jar_path: "{{ deploy_dir }}/{{ artifact_name }}"
 
   tasks:
