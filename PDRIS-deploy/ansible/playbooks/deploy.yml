@@ -1,0 +1,85 @@
+---
+- name: Deploy pdris-app
+  hosts: app_hosts
+  gather_facts: true
+  become: true
+  vars:
+    deploy_dir: /opt/pdris
+    service_name: pdris-app
+    artifact_name: pdris-app.jar
+    app_jar_path: "{{ deploy_dir }}/{{ artifact_name }}"
+
+  tasks:
+    - name: Ensure deploy dir exists
+      ansible.builtin.file:
+        path: "{{ deploy_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install Java (Debian/Ubuntu)
+      ansible.builtin.apt:
+        name: openjdk-17-jre-headless
+        state: present
+        update_cache: true
+      when: ansible_facts.os_family == "Debian"
+
+    - name: Upload artifact from controller
+      ansible.builtin.copy:
+        src: "{{ artifact_local_path }}"
+        dest: "{{ app_jar_path }}"
+        mode: "0644"
+      when: artifact_local_path is defined and artifact_local_path | length > 0
+
+    - name: Download artifact from Nexus
+      ansible.builtin.get_url:
+        url: "{{ artifact_url }}"
+        dest: "{{ app_jar_path }}"
+        mode: "0644"
+      when: (artifact_local_path is not defined or artifact_local_path | length == 0) and artifact_url is defined and artifact_url | length > 0
+
+    - name: Render systemd unit (if systemd exists)
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/{{ service_name }}.service"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description={{ service_name }}
+          After=network.target
+
+          [Service]
+          Type=simple
+          WorkingDirectory={{ deploy_dir }}
+          ExecStart=/usr/bin/java -jar {{ app_jar_path }}
+          Restart=always
+          RestartSec=3
+
+          [Install]
+          WantedBy=multi-user.target
+      when: ansible_facts.service_mgr == "systemd"
+
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: ansible_facts.service_mgr == "systemd"
+
+    - name: Enable and restart service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        enabled: true
+        state: restarted
+      when: ansible_facts.service_mgr == "systemd"
+
+    - name: Run app without systemd (fallback)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        mkdir -p /var/run/pdris
+        if [ -f /var/run/pdris/{{ service_name }}.pid ] && kill -0 "$(cat /var/run/pdris/{{ service_name }}.pid)" 2>/dev/null; then
+          kill "$(cat /var/run/pdris/{{ service_name }}.pid)" || true
+          sleep 1
+        fi
+        nohup /usr/bin/java -jar "{{ app_jar_path }}" > "{{ deploy_dir }}/{{ service_name }}.log" 2>&1 &
+        echo $! > /var/run/pdris/{{ service_name }}.pid
+      args:
+        executable: /bin/bash
+      when: ansible_facts.service_mgr != "systemd"
+
