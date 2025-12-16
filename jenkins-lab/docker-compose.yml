@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: docker/app/Dockerfile
-    container_name: pdris-app-host
+    container_name: devops_sem_task5_project-host
     hostname: app
     restart: unless-stopped
     ports:

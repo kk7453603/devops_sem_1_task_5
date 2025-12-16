@@ -4,7 +4,7 @@ pipeline {
     parameters {
         string(name: 'ARTIFACT_URL', defaultValue: '', description: 'URL до jar в Nexus')
         string(name: 'NEXUS_CREDENTIALS_ID', defaultValue: 'nexus_cred', description: 'Credentials ID для Nexus')
-        string(name: 'DEPLOY_REPO_URL', defaultValue: 'https://github.com/kk7453603/devops_sem_task5_pipelines.git', description: 'Git repo с Ansible')
+        string(name: 'DEPLOY_REPO_URL', defaultValue: 'https://github.com/kk7453603/devops_sem_task5_deploy.git', description: 'Git repo с Ansible')
         string(name: 'DEPLOY_REPO_BRANCH', defaultValue: 'main', description: 'Ветка Ansible repo')
         string(name: 'GIT_CREDENTIALS_ID', defaultValue: '', description: 'Credentials ID для Git (опционально)')
         string(name: 'INVENTORY', defaultValue: 'ansible/inventory/hosts.ini', description: 'Inventory файл')
@@ -12,7 +12,8 @@ pipeline {
     }
 
     environment {
-        // Явно устанавливаем переменные окружения
+        // Явно устанавливаем переменные окружения из параметров
+        ARTIFACT_URL = "${params.ARTIFACT_URL}"
         NEXUS_URL = "http://nexus:8081"
     }
 
@@ -20,16 +21,20 @@ pipeline {
         stage('Download from Nexus') {
             steps {
                 script {
+                    // Логирование для отладки
+                    echo "ARTIFACT_URL parameter: ${params.ARTIFACT_URL}"
+                    echo "ARTIFACT_URL environment: ${env.ARTIFACT_URL}"
+                    
                     if (!params.ARTIFACT_URL?.trim()) {
-                        error("ARTIFACT_URL is required")
+                        error("ARTIFACT_URL is required but not provided. Received: '${params.ARTIFACT_URL}'")
                     }
                 }
                 withCredentials([usernamePassword(credentialsId: params.NEXUS_CREDENTIALS_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     sh """
-                      rm -f pdris-app.jar
-                      echo "Downloading: ${ARTIFACT_URL}"
-                      curl -f -u "$NEXUS_USER:$NEXUS_PASS" -o pdris-app.jar "${ARTIFACT_URL}"
-                      ls -la pdris-app.jar
+                      rm -f devops_sem_task5_project.jar
+                      echo "Downloading: ${params.ARTIFACT_URL}"
+                      curl -f -u "$NEXUS_USER:$NEXUS_PASS" -o devops_sem_task5_project.jar "${params.ARTIFACT_URL}"
+                      ls -la devops_sem_task5_project.jar
                     """
                 }
             }
@@ -52,7 +57,7 @@ pipeline {
                 script {
                     def inventoryPath = params.INVENTORY ?: 'ansible/inventory/hosts.ini'
                     def inventoryContent = '''[app_hosts]
-# Dockerized app host (service name: app / container: pdris-app-host)
+# Dockerized app host (service name: app / container: devops_sem_task5_project-host)
 app ansible_host=app ansible_user=root ansible_password=admin ansible_port=22 ansible_python_interpreter=/usr/bin/python3
 '''
                     writeFile file: inventoryPath, text: inventoryContent
@@ -76,8 +81,8 @@ app ansible_host=app ansible_user=root ansible_password=admin ansible_port=22 an
                   set -e
                   export ANSIBLE_CONFIG=ansible/ansible.cfg
                   export ANSIBLE_HOST_KEY_CHECKING=False
-                  ansible-playbook -i "${INVENTORY}" "${PLAYBOOK}" \
-                    -e artifact_local_path="${WORKSPACE}/pdris-app.jar"
+                  ansible-playbook -i "${params.INVENTORY}" "${params.PLAYBOOK}" \
+                    -e artifact_local_path="${WORKSPACE}/devops_sem_task5_project.jar"
                 """
             }
         }

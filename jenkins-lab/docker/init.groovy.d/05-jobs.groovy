@@ -45,4 +45,6 @@ ensureJdk("jdk17", javaHome)
 
 def pipelinesDir = new File(jenkins.getRootDir(), "pipelines")
 ensurePipelineJob("pdris-build", new File(pipelinesDir, "pdris-build.Jenkinsfile"))
+// ИСПРАВЛЕНИЕ: изменили имя job'а с "devops_sem_task5_pipelines" на "pdris"
+// и указали правильный файл Jenkinsfile
 ensurePipelineJob("pdris-deploy", new File(pipelinesDir, "pdris-deploy.Jenkinsfile"))

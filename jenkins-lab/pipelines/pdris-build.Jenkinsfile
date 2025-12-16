@@ -51,7 +51,7 @@ pipeline {
             steps {
                 script {
                     try {
-                        def commonArgs = "-DskipTests sonar:sonar -Dsonar.projectKey=pdris-app -Dsonar.projectName=pdris-app -Dsonar.host.url=${env.SONAR_URL}"
+                        def commonArgs = "-DskipTests sonar:sonar -Dsonar.projectKey=devops_sem_task5_project -Dsonar.projectName=devops_sem_task5_project -Dsonar.host.url=${env.SONAR_URL}"
                         if (env.SONAR_TOKEN_CREDENTIALS_ID?.trim()) {
                             withCredentials([string(credentialsId: env.SONAR_TOKEN_CREDENTIALS_ID, variable: 'SONAR_TOKEN')]) {
                                 sh "mvn -B ${commonArgs} -Dsonar.token=$SONAR_TOKEN"
@@ -92,13 +92,14 @@ pipeline {
             steps {
                 sh "mvn -B -DskipTests package"
                 script {
-                    def artifactPath = "pdris-app/${env.BUILD_NUMBER}/pdris-app.jar"
+                    def artifactPath = "devops_sem_task5_project/${env.BUILD_NUMBER}/devops_sem_task5_project.jar"
                     env.PUBLISHED_ARTIFACT_URL = "${env.NEXUS_URL}/repository/${env.NEXUS_REPOSITORY}/${artifactPath}"
+                    echo "Artifact URL: ${env.PUBLISHED_ARTIFACT_URL}"
                 }
                 withCredentials([usernamePassword(credentialsId: env.NEXUS_CREDENTIALS_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
                     sh """
                       echo "Uploading to: ${PUBLISHED_ARTIFACT_URL}"
-                      curl -f -u "$NEXUS_USER:$NEXUS_PASS" --upload-file target/pdris-app.jar "${PUBLISHED_ARTIFACT_URL}"
+                      curl -f -u "$NEXUS_USER:$NEXUS_PASS" --upload-file target/devops_sem_task5_project.jar "${PUBLISHED_ARTIFACT_URL}"
                     """
                 }
             }
@@ -107,10 +108,16 @@ pipeline {
         stage('Run Job') {
             steps {
                 script {
-                    build job: env.DEPLOY_JOB_NAME, wait: false, parameters: [
-                        string(name: 'ARTIFACT_URL', value: env.PUBLISHED_ARTIFACT_URL),
-                        string(name: 'NEXUS_CREDENTIALS_ID', value: env.NEXUS_CREDENTIALS_ID)
-                    ]
+                    echo "Starting deploy job with parameters:"
+                    echo "  ARTIFACT_URL: ${env.PUBLISHED_ARTIFACT_URL}"
+                    echo "  NEXUS_CREDENTIALS_ID: ${env.NEXUS_CREDENTIALS_ID}"
+                    
+                    build job: env.DEPLOY_JOB_NAME, 
+                          wait: false, 
+                          parameters: [
+                              string(name: 'ARTIFACT_URL', value: "${env.PUBLISHED_ARTIFACT_URL}"),
+                              string(name: 'NEXUS_CREDENTIALS_ID', value: "${env.NEXUS_CREDENTIALS_ID}")
+                          ]
                 }
             }
         }
